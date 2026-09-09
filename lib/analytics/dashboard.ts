@@ -12,6 +12,8 @@ export type TopArticle = {
   title: string;
   slug: string;
   views: number;
+  previousViews: number;
+  trend: number;
 };
 
 export type CountryVisitor = {
@@ -69,20 +71,24 @@ export async function getDashboardAnalytics(
   const [
     currentVisitsResult,
     previousVisitsResult,
-    articleViewsResult,
+    currentArticleViewsResult,
+    previousArticleViewsResult,
   ] = await Promise.all([
+    // Current site visits
     supabase
       .from("site_visits")
       .select("visitor_id, country, visited_at")
       .gte("visited_at", currentStartISO)
       .lte("visited_at", nowISO),
 
+    // Previous-period site visits
     supabase
       .from("site_visits")
       .select("id")
       .gte("visited_at", previousStartISO)
       .lt("visited_at", currentStartISO),
 
+    // Current article views
     supabase
       .from("article_views")
       .select(`
@@ -97,6 +103,16 @@ export async function getDashboardAnalytics(
       `)
       .gte("visited_at", currentStartISO)
       .lte("visited_at", nowISO),
+
+    // Previous-period article views
+    supabase
+      .from("article_views")
+      .select(`
+        article_id,
+        visited_at
+      `)
+      .gte("visited_at", previousStartISO)
+      .lt("visited_at", currentStartISO),
   ]);
 
   if (currentVisitsResult.error) {
@@ -113,16 +129,24 @@ export async function getDashboardAnalytics(
     );
   }
 
-  if (articleViewsResult.error) {
+  if (currentArticleViewsResult.error) {
     console.error(
-      "Failed to load article views:",
-      articleViewsResult.error
+      "Failed to load current article views:",
+      currentArticleViewsResult.error
+    );
+  }
+
+  if (previousArticleViewsResult.error) {
+    console.error(
+      "Failed to load previous article views:",
+      previousArticleViewsResult.error
     );
   }
 
   const currentVisits = currentVisitsResult.data ?? [];
   const previousVisits = previousVisitsResult.data ?? [];
-  const articleViews = articleViewsResult.data ?? [];
+  const currentArticleViews = currentArticleViewsResult.data ?? [];
+  const previousArticleViews = previousArticleViewsResult.data ?? [];
 
   // ---------------------------------------------------------
   // TOTAL VIEWS
@@ -185,15 +209,27 @@ export async function getDashboardAnalytics(
   }));
 
   // ---------------------------------------------------------
+  // PREVIOUS ARTICLE VIEW COUNTS
+  // ---------------------------------------------------------
+
+  const previousArticleViewCounts = new Map<string, number>();
+
+  for (const view of previousArticleViews) {
+    if (!view.article_id) continue;
+
+    previousArticleViewCounts.set(
+      view.article_id,
+      (previousArticleViewCounts.get(view.article_id) ?? 0) + 1
+    );
+  }
+
+  // ---------------------------------------------------------
   // TOP ARTICLES
   // ---------------------------------------------------------
 
-  const articleMap = new Map<
-    string,
-    TopArticle
-  >();
+  const articleMap = new Map<string, TopArticle>();
 
-  for (const view of articleViews) {
+  for (const view of currentArticleViews) {
     const articleRelation = view.articles;
 
     const article = Array.isArray(articleRelation)
@@ -214,18 +250,28 @@ export async function getDashboardAnalytics(
       title: article.title,
       slug: article.slug,
       views: 1,
+      previousViews:
+        previousArticleViewCounts.get(article.id) ?? 0,
+      trend: 0,
     });
   }
 
   const topArticles = Array.from(articleMap.values())
+    .map((article) => ({
+      ...article,
+      trend: calculateTrend(
+        article.views,
+        article.previousViews
+      ),
+    }))
     .sort((a, b) => b.views - a.views)
     .slice(0, 5);
 
   // ---------------------------------------------------------
   // VISITORS BY COUNTRY
   //
-  // Count UNIQUE visitor IDs per country, rather than counting
-  // every page refresh as another visitor.
+  // Count UNIQUE visitor IDs per country rather than counting
+  // every page view as another visitor.
   // ---------------------------------------------------------
 
   const countryVisitors = new Map<
