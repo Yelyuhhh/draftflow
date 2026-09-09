@@ -22,6 +22,22 @@ function getPeriod(value?: string): DashboardPeriod {
   return 30;
 }
 
+function getCountryName(countryCode: string) {
+  if (!countryCode || countryCode === "UNKNOWN") {
+    return "Unknown";
+  }
+
+  try {
+    const displayNames = new Intl.DisplayNames(["en"], {
+      type: "region",
+    });
+
+    return displayNames.of(countryCode) ?? countryCode;
+  } catch {
+    return countryCode;
+  }
+}
+
 export default async function AdminDashboardPage({
   searchParams,
 }: AdminDashboardPageProps) {
@@ -331,62 +347,57 @@ export default async function AdminDashboardPage({
 
                 {/* Article Rows */}
                 <div className="divide-y divide-slate-100">
-                  {analytics.topArticles.map((article, index) => {
-                    const articleTrendPositive =
-                      article.trend >= 0;
+                  {analytics.topArticles.map((article, index) => (
+                    <div
+                      key={article.id}
+                      className="grid grid-cols-[32px_minmax(0,1fr)_80px_90px] items-center gap-3 py-4"
+                    >
+                      <span className="text-sm text-slate-400">
+                        {index + 1}
+                      </span>
 
-                    return (
-                      <div
-                        key={article.id}
-                        className="grid grid-cols-[32px_minmax(0,1fr)_80px_90px] items-center gap-3 py-4"
-                      >
-                        <span className="text-sm text-slate-400">
-                          {index + 1}
-                        </span>
-
-                        <div className="min-w-0">
-                          <Link
-                            href={`/articles/${article.slug}`}
-                            target="_blank"
-                            className="block truncate text-sm font-semibold text-slate-900 transition hover:text-blue-600"
-                          >
-                            {article.title}
-                          </Link>
-
-                          <p className="mt-1 text-xs text-slate-400">
-                            Previous:{" "}
-                            {article.previousViews.toLocaleString()}{" "}
-                            {article.previousViews === 1
-                              ? "view"
-                              : "views"}
-                          </p>
-                        </div>
-
-                        <span className="text-right text-sm font-semibold text-slate-700">
-                          {article.views.toLocaleString()}
-                        </span>
-
-                        <span
-                          className={`text-right text-sm font-semibold ${
-                            article.trend > 0
-                              ? "text-emerald-600"
-                              : article.trend < 0
-                                ? "text-red-500"
-                                : "text-slate-400"
-                          }`}
+                      <div className="min-w-0">
+                        <Link
+                          href={`/articles/${article.slug}`}
+                          target="_blank"
+                          className="block truncate text-sm font-semibold text-slate-900 transition hover:text-blue-600"
                         >
-                          {article.trend > 0
-                            ? "↑"
-                            : article.trend < 0
-                              ? "↓"
-                              : "—"}{" "}
-                          {article.trend !== 0
-                            ? `${Math.abs(article.trend)}%`
-                            : "0%"}
-                        </span>
+                          {article.title}
+                        </Link>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          Previous:{" "}
+                          {article.previousViews.toLocaleString()}{" "}
+                          {article.previousViews === 1
+                            ? "view"
+                            : "views"}
+                        </p>
                       </div>
-                    );
-                  })}
+
+                      <span className="text-right text-sm font-semibold text-slate-700">
+                        {article.views.toLocaleString()}
+                      </span>
+
+                      <span
+                        className={`text-right text-sm font-semibold ${
+                          article.trend > 0
+                            ? "text-emerald-600"
+                            : article.trend < 0
+                              ? "text-red-500"
+                              : "text-slate-400"
+                        }`}
+                      >
+                        {article.trend > 0
+                          ? "↑"
+                          : article.trend < 0
+                            ? "↓"
+                            : "—"}{" "}
+                        {article.trend !== 0
+                          ? `${Math.abs(article.trend)}%`
+                          : "0%"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -419,21 +430,41 @@ export default async function AdminDashboardPage({
                 {analytics.countries.map((country) => (
                   <div
                     key={country.country}
-                    className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4 text-sm"
+                    className="py-4"
                   >
-                    <span className="font-medium text-slate-800">
-                      {country.country === "UNKNOWN"
-                        ? "Unknown"
-                        : country.country}
-                    </span>
+                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800">
+                          {getCountryName(country.country)}
+                        </p>
 
-                    <span className="text-slate-600">
-                      {country.visitors.toLocaleString()}
-                    </span>
+                        {country.country !== "UNKNOWN" && (
+                          <p className="mt-0.5 text-xs uppercase text-slate-400">
+                            {country.country}
+                          </p>
+                        )}
+                      </div>
 
-                    <span className="w-14 text-right text-slate-500">
-                      {country.percentage}%
-                    </span>
+                      <span className="text-slate-600">
+                        {country.visitors.toLocaleString()}
+                      </span>
+
+                      <span className="w-14 text-right font-medium text-slate-500">
+                        {country.percentage}%
+                      </span>
+                    </div>
+
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-blue-500 transition-all"
+                        style={{
+                          width: `${Math.min(
+                            Math.max(country.percentage, 0),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
