@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
 import { createClient } from "@/lib/supabase/server";
+import ArticleViewTracker from "@/components/analytics/article-view-tracker";
 
 type ArticlePageProps = {
   params: Promise<{
@@ -38,8 +40,9 @@ export default async function ArticlePage({
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <ArticleViewTracker articleId={article.id} />
+
       <article className="mx-auto max-w-4xl px-6 py-12">
-        {/* Back to Articles */}
         <Link
           href="/articles"
           className="text-sm text-slate-400 transition hover:text-white"
@@ -47,7 +50,6 @@ export default async function ArticlePage({
           ← Back to Articles
         </Link>
 
-        {/* Article Header */}
         <header className="mt-8">
           <p className="text-sm text-slate-500">
             {publishedDate}
@@ -64,7 +66,6 @@ export default async function ArticlePage({
           )}
         </header>
 
-        {/* Cover Image */}
         {article.cover_image && (
           <div className="mt-8 overflow-hidden rounded-2xl border border-slate-800">
             <img
@@ -75,7 +76,6 @@ export default async function ArticlePage({
           </div>
         )}
 
-        {/* Article Content */}
         <div className="mt-10 border-t border-slate-800 pt-10">
           <div
             className="
@@ -114,7 +114,6 @@ export default async function ArticlePage({
           </div>
         </div>
 
-        {/* Bottom Navigation */}
         <div className="mt-12 border-t border-slate-800 pt-6">
           <Link
             href="/articles"
