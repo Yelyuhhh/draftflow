@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -20,84 +21,86 @@ export default async function AdminLayout({
 }) {
   const supabase = await createClient();
 
-  // Verify the authenticated user on the server.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Not authenticated → send to login.
   if (!user) {
     redirect("/login?redirectTo=/admin");
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-slate-900 lg:block">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <aside className="fixed inset-y-0 left-0 hidden w-[272px] border-r border-slate-200 bg-white lg:block">
         <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="border-b border-slate-800 px-6 py-5">
-            <Link
-              href="/admin"
-              className="text-lg font-bold tracking-tight"
-            >
-              Draftflow
+          <div className="px-6 pb-5 pt-8">
+            <Link href="/admin" className="inline-block">
+              <Image
+                src="/logo.png"
+                alt="Draftflow"
+                width={150}
+                height={80}
+                priority
+                className="h-auto w-[150px]"
+              />
             </Link>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Admin Dashboard
-            </p>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
-            <Link
-              href="/admin"
-              className="block rounded-lg px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            >
-              Dashboard
-            </Link>
+          <nav className="flex-1 px-3 pt-4">
+            <div className="space-y-2">
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+              >
+                <span className="flex h-5 w-5 items-center justify-center text-lg">
+                  ⌂
+                </span>
+                <span>Dashboard</span>
+              </Link>
 
-            <Link
-              href="/admin/articles"
-              className="block rounded-lg px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            >
-              Articles
-            </Link>
-
-            <Link
-              href="/admin/articles/new"
-              className="block rounded-lg px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            >
-              New Article
-            </Link>
+              <Link
+                href="/admin/articles"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                <span className="flex h-5 w-5 items-center justify-center text-lg">
+                  ▤
+                </span>
+                <span>Articles</span>
+              </Link>
+            </div>
           </nav>
 
-          {/* Footer */}
-          <div className="border-t border-slate-800 p-4">
-            <Link
-              href="/articles"
-              target="_blank"
-              className="block rounded-lg px-4 py-2.5 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              View Website →
-            </Link>
-
-            <form action={logout} className="mt-2">
-              <button
-                type="submit"
-                className="block w-full rounded-lg px-4 py-2.5 text-left text-sm text-slate-400 transition hover:bg-red-950/40 hover:text-red-300"
+          <div className="p-3">
+            <div className="rounded-xl border border-slate-200 bg-white">
+              <Link
+                href="/articles"
+                target="_blank"
+                className="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
               >
-                Sign Out
-              </button>
-            </form>
+                <span>View Website</span>
+                <span className="text-slate-500">↗</span>
+              </Link>
+
+              <div className="mx-4 border-t border-slate-100" />
+
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                >
+                  <span>Sign out</span>
+                  <span className="text-slate-500">↪</span>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="lg:pl-64">
-        {children}
+      <div className="lg:pl-[272px]">
+        <main className="min-h-screen bg-slate-50">
+          {children}
+        </main>
       </div>
     </div>
   );
