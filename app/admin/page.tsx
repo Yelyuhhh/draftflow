@@ -25,6 +25,24 @@ type AdminDashboardPageProps = {
   }>;
 };
 
+const regionNames = new Intl.DisplayNames(["en"], {
+  type: "region",
+});
+
+function getCountryName(countryCode: string) {
+  const code = countryCode.trim().toUpperCase();
+
+  if (!code || code === "UNKNOWN") {
+    return "Unknown";
+  }
+
+  try {
+    return regionNames.of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
 function getPeriod(value?: string): DashboardPeriod {
   if (value === "7") return 7;
   if (value === "90") return 90;
@@ -599,12 +617,17 @@ export default async function AdminDashboardPage({
                       }
                       className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4 text-sm"
                     >
-                      <span className="font-medium text-slate-800">
-                        {country.country ===
-                        "UNKNOWN"
-                          ? "Unknown"
-                          : country.country}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800">
+                          {getCountryName(country.country)}
+                        </p>
+
+                        {country.country !== "UNKNOWN" && (
+                          <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                            {country.country}
+                          </p>
+                        )}
+                      </div>
 
                       <span className="text-slate-600">
                         {country.visitors.toLocaleString()}
