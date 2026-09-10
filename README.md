@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Draftflow
 
-## Getting Started
+Draftflow is a modern content management system designed for creating, managing, publishing, and monitoring website content from a centralized administrative dashboard.
 
-First, run the development server:
+It separates content management from the public-facing website, allowing articles and related data to be maintained independently and delivered dynamically to the frontend.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Draftflow was initially implemented for **The Compass**, where it serves as the content management layer for the organization's website.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Live Demo
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+A deployed version of Draftflow is available here:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+https://draftflow-indol.vercel.app/
 
-## Learn More
+For portfolio and demonstration purposes, a demo administrator account may be provided with restricted permissions.
 
-To learn more about Next.js, take a look at the following resources:
+**Demo Account**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Email: `admin@example.com`
+Password: `admin123`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The demo account should only be used for exploring the interface and available CMS features.
 
-## Deploy on Vercel
+## Overview
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Draftflow provides an administrative environment for managing digital content without directly modifying the public website.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Through the CMS, administrators can manage articles, control publication status, review content performance, and monitor website activity.
+
+The project is built around a structured content workflow that connects the administrative dashboard, database, authentication system, and public-facing website.
+
+## Features
+
+### Content Management
+
+Draftflow provides tools for managing article content throughout its lifecycle.
+
+* Create and edit articles
+* Save articles as drafts
+* Publish content
+* Manage publication status
+* Store article data and metadata
+* Retrieve published content dynamically
+* Maintain content independently from the frontend website
+
+### Dashboard
+
+The administrative dashboard provides an overview of content and website activity, including:
+
+* Total articles
+* Published articles
+* Draft articles
+* Total article views
+* Top-performing articles
+* Visitor locations by country
+
+### Authentication
+
+Draftflow includes authentication for securing access to the administrative interface.
+
+Administrative functionality is separated from the public-facing website so that content management tools remain available only to authorized users.
+
+### Dynamic Content Delivery
+
+Published content is stored within the CMS database and retrieved dynamically by the public website.
+
+This allows articles and other content to be updated without requiring direct modifications to the frontend application.
+
+### Analytics
+
+Draftflow includes basic content and visitor analytics, including:
+
+* Article views
+* Content performance
+* Most-viewed articles
+* Visitor countries
+
+## The Compass Integration
+
+**The Compass** serves as Draftflow's initial implementation.
+
+Draftflow manages the website's article content through a separate administrative system, while The Compass retrieves and displays published content on its public-facing website.
+
+This allows the CMS and the website to operate as separate components of the same content ecosystem.
+
+## Technology Stack
+
+### Application
+
+* Next.js
+* TypeScript
+* Tailwind CSS
+
+### Backend and Database
+
+* Supabase
+* PostgreSQL
+
+### Services
+
+* Supabase Authentication
+* Supabase Database
+
+## Architecture
+
+Draftflow follows a CMS-based architecture where content administration and content presentation are separated.
+
+The general content flow is:
+
+**Administrator → Draftflow CMS → Database → API/Data Layer → Public Website**
+
+Administrators manage content through Draftflow. The content is stored in the database and made available to the public-facing website, where it is rendered dynamically for visitors.
+
+## Current Scope
+
+Draftflow currently focuses on article-based content management and the supporting administrative tools required to manage and monitor content.
+
+The architecture can be expanded to support additional functionality such as media management, content categories, publishing workflows, enhanced analytics, and additional content types.
+
+## Project Status
+
+Draftflow is currently under active development.
+
+Features, interfaces, database structures, and system architecture may continue to evolve as the project expands.
