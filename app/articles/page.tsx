@@ -1,133 +1,154 @@
-import Link from "next/link";
+import PublicNavbar from "@/components/public/PublicNavbar";
+import ArticleCard from "@/components/public/ArticleCard";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+type Article = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  cover_image: string | null;
+  authors: string[] | null;
+  published_at: string | null;
+  created_at: string;
+};
+
 export default async function ArticlesPage() {
   const supabase = await createClient();
 
-  const { data: articles, error } = await supabase
+  const { data, error } = await supabase
     .from("articles")
     .select(
-      "id, title, slug, excerpt, content, cover_image, status, published_at, created_at"
+      `
+        id,
+        title,
+        slug,
+        excerpt,
+        content,
+        cover_image,
+        authors,
+        published_at,
+        created_at
+      `
     )
     .eq("status", "published")
-    .order("published_at", { ascending: false });
+    .order("published_at", {
+      ascending: false,
+      nullsFirst: false,
+    })
+    .order("created_at", {
+      ascending: false,
+    });
+
+  const articles = (data ?? []) as Article[];
+
+  const featuredArticle = articles[0] ?? null;
+  const remainingArticles = articles.slice(1);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        {/* Header */}
-        <header className="mb-10">
-          <p className="text-sm font-medium text-slate-500">
-            Draftflow
-          </p>
+    <main className="min-h-screen bg-[#F8FCFD] text-slate-950">
+      <PublicNavbar active="articles" />
 
-          <h1 className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">
-            Articles
-          </h1>
+      <section className="border-b border-[#CBF2F9] bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-14 sm:py-16 lg:py-20">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#007CB6]">
+              Draftflow Journal
+            </p>
 
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-400">
-            Insights, stories, and updates from Draftflow.
-          </p>
-        </header>
+            <h1 className="mt-4 font-serif text-5xl font-semibold tracking-[-0.03em] text-[#04045E] sm:text-6xl">
+              Articles
+            </h1>
 
-        {/* Error */}
-        {error && (
-          <div className="rounded-xl border border-red-900 bg-red-950/40 p-6">
-            <h2 className="font-semibold text-red-400">
-              Unable to load articles
-            </h2>
-
-            <p className="mt-2 text-sm text-red-300">
-              {error.message}
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+              Clear, thoughtful stories and practical ideas about money,
+              communities, and the systems that shape everyday life.
             </p>
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* Empty State */}
-        {!error && (!articles || articles.length === 0) && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10 text-center">
-            <h2 className="text-xl font-semibold text-white">
-              No articles yet
+      <section className="mx-auto max-w-7xl px-6 py-12 sm:py-14 lg:py-16">
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-8">
+            <h2 className="text-lg font-semibold text-red-900">
+              We couldn&apos;t load the articles.
             </h2>
 
-            <p className="mt-2 text-slate-400">
-              Published articles will appear here.
+            <p className="mt-2 text-sm leading-6 text-red-700">
+              Please refresh the page and try again.
             </p>
           </div>
-        )}
+        ) : articles.length === 0 ? (
+          <div className="rounded-[28px] border border-[#CBF2F9] bg-white px-6 py-16 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#CBF2F9] text-2xl text-[#04045E]">
+              ✦
+            </div>
 
-        {/* Articles */}
-        {!error && articles && articles.length > 0 && (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {articles.map((article) => {
-              const publishedDate = new Date(
-                article.published_at || article.created_at
-              ).toLocaleDateString();
+            <h2 className="mt-5 font-serif text-2xl font-semibold text-[#04045E]">
+              No published articles yet
+            </h2>
 
-              return (
-                <article
-                  key={article.id}
-                  className="group overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 transition hover:border-slate-700 hover:bg-slate-900/80"
-                >
-                  {/* Cover Image */}
-                  {article.cover_image ? (
-                    <Link href={`/articles/${article.slug}`}>
-                      <div className="aspect-video overflow-hidden bg-slate-800">
-                        <img
-                          src={article.cover_image}
-                          alt={article.title}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        />
-                      </div>
-                    </Link>
-                  ) : (
-                    <Link href={`/articles/${article.slug}`}>
-                      <div className="flex aspect-video items-center justify-center bg-slate-800">
-                        <span className="text-sm text-slate-500">
-                          Draftflow
-                        </span>
-                      </div>
-                    </Link>
-                  )}
-
-                  {/* Content */}
-                  <div className="p-6">
-                    <p className="text-xs text-slate-500">
-                      {publishedDate}
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+              New stories will appear here once they are published.
+            </p>
+          </div>
+        ) : (
+          <>
+            {featuredArticle && (
+              <div>
+                <div className="mb-5 flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#007CB6]">
+                      Latest
                     </p>
 
-                    <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">
-                      <Link
-                        href={`/articles/${article.slug}`}
-                        className="transition hover:text-slate-300"
-                      >
-                        {article.title}
-                      </Link>
+                    <h2 className="mt-1 font-serif text-2xl font-semibold text-[#04045E]">
+                      Featured story
                     </h2>
-
-                    {article.excerpt && (
-                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">
-                        {article.excerpt}
-                      </p>
-                    )}
-
-                    <div className="mt-6">
-                      <Link
-                        href={`/articles/${article.slug}`}
-                        className="text-sm font-medium text-slate-300 transition hover:text-white"
-                      >
-                        Read article →
-                      </Link>
-                    </div>
                   </div>
-                </article>
-              );
-            })}
-          </div>
+
+                  <p className="hidden text-sm text-slate-400 sm:block">
+                    {articles.length}{" "}
+                    {articles.length === 1 ? "article" : "articles"}
+                  </p>
+                </div>
+
+                <ArticleCard
+                  article={featuredArticle}
+                  featured
+                />
+              </div>
+            )}
+
+            {remainingArticles.length > 0 && (
+              <div className="mt-14 sm:mt-16">
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#007CB6]">
+                    More from Draftflow
+                  </p>
+
+                  <h2 className="mt-1 font-serif text-2xl font-semibold text-[#04045E]">
+                    Explore more stories
+                  </h2>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {remainingArticles.map((article) => (
+                    <ArticleCard
+                      key={article.id}
+                      article={article}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
-      </div>
+      </section>
     </main>
   );
 }

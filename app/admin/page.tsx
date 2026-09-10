@@ -1,4 +1,14 @@
 import Link from "next/link";
+
+import {
+  AltArrowRightIcon,
+  ChartSquareIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  FolderWithFilesIcon,
+  PenNewSquareIcon,
+} from "@solar-icons/react/linear";
+
 import ViewsChart from "@/components/analytics/ViewsChart";
 
 import { createClient } from "@/lib/supabase/server";
@@ -22,20 +32,23 @@ function getPeriod(value?: string): DashboardPeriod {
   return 30;
 }
 
-function getCountryName(countryCode: string) {
-  if (!countryCode || countryCode === "UNKNOWN") {
-    return "Unknown";
-  }
-
-  try {
-    const displayNames = new Intl.DisplayNames(["en"], {
-      type: "region",
-    });
-
-    return displayNames.of(countryCode) ?? countryCode;
-  } catch {
-    return countryCode;
-  }
+function TrendIcon({
+  positive,
+}: {
+  positive: boolean;
+}) {
+  return (
+    <AltArrowRightIcon
+      size={15}
+      strokeWidth={2}
+      className={
+        positive
+          ? "-rotate-90"
+          : "rotate-90"
+      }
+      aria-hidden="true"
+    />
+  );
 }
 
 export default async function AdminDashboardPage({
@@ -55,32 +68,55 @@ export default async function AdminDashboardPage({
   ] = await Promise.all([
     supabase
       .from("articles")
-      .select("*", { count: "exact", head: true }),
+      .select("*", {
+        count: "exact",
+        head: true,
+      }),
 
     supabase
       .from("articles")
-      .select("*", { count: "exact", head: true })
+      .select("*", {
+        count: "exact",
+        head: true,
+      })
       .eq("status", "published"),
 
     supabase
       .from("articles")
-      .select("*", { count: "exact", head: true })
+      .select("*", {
+        count: "exact",
+        head: true,
+      })
       .eq("status", "draft"),
 
     getDashboardAnalytics(days),
   ]);
 
-  const total = totalArticles ?? 0;
-  const published = publishedArticles ?? 0;
-  const drafts = draftArticles ?? 0;
+  const total =
+    totalArticles ?? 0;
+
+  const published =
+    publishedArticles ?? 0;
+
+  const drafts =
+    draftArticles ?? 0;
 
   const publishedPercentage =
-    total > 0 ? Math.round((published / total) * 100) : 0;
+    total > 0
+      ? Math.round(
+          (published / total) * 100
+        )
+      : 0;
 
   const draftPercentage =
-    total > 0 ? Math.round((drafts / total) * 100) : 0;
+    total > 0
+      ? Math.round(
+          (drafts / total) * 100
+        )
+      : 0;
 
-  const trendIsPositive = analytics.viewsTrend >= 0;
+  const trendIsPositive =
+    analytics.viewsTrend >= 0;
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 py-8 lg:px-10">
@@ -104,9 +140,17 @@ export default async function AdminDashboardPage({
 
           <Link
             href="/admin/articles/new"
-            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            + New Article
+            <PenNewSquareIcon
+              size={18}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+
+            <span>
+              New Article
+            </span>
           </Link>
         </div>
       </header>
@@ -124,7 +168,11 @@ export default async function AdminDashboardPage({
           {/* Total Articles */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              ▤
+              <DocumentTextIcon
+                size={21}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
             </div>
 
             <p className="mt-5 text-sm font-semibold text-slate-700">
@@ -139,7 +187,11 @@ export default async function AdminDashboardPage({
           {/* Published */}
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-sm">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              ✓
+              <FolderWithFilesIcon
+                size={21}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
             </div>
 
             <p className="mt-5 text-sm font-semibold text-slate-700">
@@ -160,7 +212,11 @@ export default async function AdminDashboardPage({
           {/* Drafts */}
           <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5 shadow-sm">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-              ✎
+              <PenNewSquareIcon
+                size={21}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
             </div>
 
             <p className="mt-5 text-sm font-semibold text-slate-700">
@@ -181,7 +237,11 @@ export default async function AdminDashboardPage({
           {/* Total Views */}
           <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-5 shadow-sm">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-blue-600">
-              ▥
+              <EyeIcon
+                size={21}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
             </div>
 
             <p className="mt-5 text-sm font-semibold text-slate-700">
@@ -194,14 +254,27 @@ export default async function AdminDashboardPage({
               </p>
 
               <p
-                className={`pb-1 text-sm font-semibold ${
+                className={`flex items-center gap-1 pb-1 text-sm font-semibold ${
                   trendIsPositive
                     ? "text-emerald-600"
                     : "text-red-500"
                 }`}
               >
-                {trendIsPositive ? "↑" : "↓"}{" "}
-                {Math.abs(analytics.viewsTrend)}%
+                {analytics.viewsTrend !==
+                  0 && (
+                  <TrendIcon
+                    positive={
+                      trendIsPositive
+                    }
+                  />
+                )}
+
+                <span>
+                  {Math.abs(
+                    analytics.viewsTrend
+                  )}
+                  %
+                </span>
               </p>
             </div>
 
@@ -219,7 +292,9 @@ export default async function AdminDashboardPage({
             <div>
               <p className="font-semibold text-slate-900">
                 You have {drafts} draft{" "}
-                {drafts === 1 ? "article" : "articles"}
+                {drafts === 1
+                  ? "article"
+                  : "articles"}
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
@@ -229,9 +304,17 @@ export default async function AdminDashboardPage({
 
             <Link
               href="/admin/articles"
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800"
             >
-              View Drafts →
+              <span>
+                View Drafts
+              </span>
+
+              <AltArrowRightIcon
+                size={16}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
             </Link>
           </div>
         </section>
@@ -241,9 +324,18 @@ export default async function AdminDashboardPage({
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Views Overview
-            </h2>
+            <div className="flex items-center gap-2">
+              <ChartSquareIcon
+                size={21}
+                strokeWidth={1.8}
+                className="text-blue-600"
+                aria-hidden="true"
+              />
+
+              <h2 className="text-xl font-bold text-slate-900">
+                Views Overview
+              </h2>
+            </div>
 
             <div className="mt-2 flex flex-wrap items-end gap-2">
               <p className="text-3xl font-bold text-slate-950">
@@ -251,14 +343,27 @@ export default async function AdminDashboardPage({
               </p>
 
               <p
-                className={`pb-1 text-sm font-semibold ${
+                className={`flex items-center gap-1 pb-1 text-sm font-semibold ${
                   trendIsPositive
                     ? "text-emerald-600"
                     : "text-red-500"
                 }`}
               >
-                {trendIsPositive ? "↑" : "↓"}{" "}
-                {Math.abs(analytics.viewsTrend)}%
+                {analytics.viewsTrend !==
+                  0 && (
+                  <TrendIcon
+                    positive={
+                      trendIsPositive
+                    }
+                  />
+                )}
+
+                <span>
+                  {Math.abs(
+                    analytics.viewsTrend
+                  )}
+                  %
+                </span>
               </p>
 
               <p className="pb-1 text-xs text-slate-400">
@@ -312,7 +417,11 @@ export default async function AdminDashboardPage({
         </div>
 
         <div className="mt-8">
-          <ViewsChart data={analytics.dailyViews} />
+          <ViewsChart
+            data={
+              analytics.dailyViews
+            }
+          />
         </div>
       </section>
 
@@ -320,18 +429,29 @@ export default async function AdminDashboardPage({
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Top Performing Articles */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Top Performing Articles
-            </h2>
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <ChartSquareIcon
+                size={19}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+            </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Ranked by views this period
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Top Performing Articles
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Ranked by views this period
+              </p>
+            </div>
           </div>
 
           <div className="mt-6">
-            {analytics.topArticles.length === 0 ? (
+            {analytics.topArticles
+              .length === 0 ? (
               <p className="py-12 text-center text-sm text-slate-400">
                 No article views yet.
               </p>
@@ -341,63 +461,95 @@ export default async function AdminDashboardPage({
                 <div className="grid grid-cols-[32px_minmax(0,1fr)_80px_90px] gap-3 border-b border-slate-100 pb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   <span>#</span>
                   <span>Article</span>
-                  <span className="text-right">Views</span>
-                  <span className="text-right">Trend</span>
+                  <span className="text-right">
+                    Views
+                  </span>
+                  <span className="text-right">
+                    Trend
+                  </span>
                 </div>
 
                 {/* Article Rows */}
                 <div className="divide-y divide-slate-100">
-                  {analytics.topArticles.map((article, index) => (
-                    <div
-                      key={article.id}
-                      className="grid grid-cols-[32px_minmax(0,1fr)_80px_90px] items-center gap-3 py-4"
-                    >
-                      <span className="text-sm text-slate-400">
-                        {index + 1}
-                      </span>
+                  {analytics.topArticles.map(
+                    (
+                      article,
+                      index
+                    ) => {
+                      const articleTrendPositive =
+                        article.trend >=
+                        0;
 
-                      <div className="min-w-0">
-                        <Link
-                          href={`/articles/${article.slug}`}
-                          target="_blank"
-                          className="block truncate text-sm font-semibold text-slate-900 transition hover:text-blue-600"
+                      return (
+                        <div
+                          key={
+                            article.id
+                          }
+                          className="grid grid-cols-[32px_minmax(0,1fr)_80px_90px] items-center gap-3 py-4"
                         >
-                          {article.title}
-                        </Link>
+                          <span className="text-sm text-slate-400">
+                            {index +
+                              1}
+                          </span>
 
-                        <p className="mt-1 text-xs text-slate-400">
-                          Previous:{" "}
-                          {article.previousViews.toLocaleString()}{" "}
-                          {article.previousViews === 1
-                            ? "view"
-                            : "views"}
-                        </p>
-                      </div>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/articles/${article.slug}`}
+                              target="_blank"
+                              className="block truncate text-sm font-semibold text-slate-900 transition hover:text-blue-600"
+                            >
+                              {
+                                article.title
+                              }
+                            </Link>
 
-                      <span className="text-right text-sm font-semibold text-slate-700">
-                        {article.views.toLocaleString()}
-                      </span>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Previous:{" "}
+                              {article.previousViews.toLocaleString()}{" "}
+                              {article.previousViews ===
+                              1
+                                ? "view"
+                                : "views"}
+                            </p>
+                          </div>
 
-                      <span
-                        className={`text-right text-sm font-semibold ${
-                          article.trend > 0
-                            ? "text-emerald-600"
-                            : article.trend < 0
-                              ? "text-red-500"
-                              : "text-slate-400"
-                        }`}
-                      >
-                        {article.trend > 0
-                          ? "↑"
-                          : article.trend < 0
-                            ? "↓"
-                            : "—"}{" "}
-                        {article.trend !== 0
-                          ? `${Math.abs(article.trend)}%`
-                          : "0%"}
-                      </span>
-                    </div>
-                  ))}
+                          <span className="text-right text-sm font-semibold text-slate-700">
+                            {article.views.toLocaleString()}
+                          </span>
+
+                          <span
+                            className={`flex items-center justify-end gap-1 text-right text-sm font-semibold ${
+                              article.trend >
+                              0
+                                ? "text-emerald-600"
+                                : article.trend <
+                                    0
+                                  ? "text-red-500"
+                                  : "text-slate-400"
+                            }`}
+                          >
+                            {article.trend !==
+                              0 && (
+                              <TrendIcon
+                                positive={
+                                  articleTrendPositive
+                                }
+                              />
+                            )}
+
+                            <span>
+                              {article.trend !==
+                              0
+                                ? `${Math.abs(
+                                    article.trend
+                                  )}%`
+                                : "0%"}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    }
+                  )}
                 </div>
               </div>
             )}
@@ -406,67 +558,67 @@ export default async function AdminDashboardPage({
 
         {/* Visitors by Country */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Visitors by Country
-            </h2>
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <EyeIcon
+                size={19}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+            </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {analytics.uniqueVisitors.toLocaleString()} unique{" "}
-              {analytics.uniqueVisitors === 1
-                ? "visitor"
-                : "visitors"}{" "}
-              this period
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Visitors by Country
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {analytics.uniqueVisitors.toLocaleString()} unique{" "}
+                {analytics.uniqueVisitors ===
+                1
+                  ? "visitor"
+                  : "visitors"}{" "}
+                this period
+              </p>
+            </div>
           </div>
 
           <div className="mt-6">
-            {analytics.countries.length === 0 ? (
+            {analytics.countries
+              .length === 0 ? (
               <p className="py-12 text-center text-sm text-slate-400">
                 No country data yet.
               </p>
             ) : (
               <div className="divide-y divide-slate-100">
-                {analytics.countries.map((country) => (
-                  <div
-                    key={country.country}
-                    className="py-4"
-                  >
-                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-800">
-                          {getCountryName(country.country)}
-                        </p>
-
-                        {country.country !== "UNKNOWN" && (
-                          <p className="mt-0.5 text-xs uppercase text-slate-400">
-                            {country.country}
-                          </p>
-                        )}
-                      </div>
+                {analytics.countries.map(
+                  (country) => (
+                    <div
+                      key={
+                        country.country
+                      }
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4 text-sm"
+                    >
+                      <span className="font-medium text-slate-800">
+                        {country.country ===
+                        "UNKNOWN"
+                          ? "Unknown"
+                          : country.country}
+                      </span>
 
                       <span className="text-slate-600">
                         {country.visitors.toLocaleString()}
                       </span>
 
-                      <span className="w-14 text-right font-medium text-slate-500">
-                        {country.percentage}%
+                      <span className="w-14 text-right text-slate-500">
+                        {
+                          country.percentage
+                        }
+                        %
                       </span>
                     </div>
-
-                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-blue-500 transition-all"
-                        style={{
-                          width: `${Math.min(
-                            Math.max(country.percentage, 0),
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </div>

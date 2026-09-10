@@ -2,6 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  DocumentTextIcon,
+  ExportIcon,
+  HomeIcon,
+  LogoutIcon,
+} from "@solar-icons/react/linear";
+
 import { createClient } from "@/lib/supabase/server";
 
 async function logout() {
@@ -52,9 +59,13 @@ export default async function AdminLayout({
                 href="/admin"
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
               >
-                <span className="flex h-5 w-5 items-center justify-center text-lg">
-                  ⌂
-                </span>
+                <HomeIcon
+                  size={20}
+                  strokeWidth={1.8}
+                  className="shrink-0"
+                  aria-hidden="true"
+                />
+
                 <span>Dashboard</span>
               </Link>
 
@@ -62,9 +73,13 @@ export default async function AdminLayout({
                 href="/admin/articles"
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
               >
-                <span className="flex h-5 w-5 items-center justify-center text-lg">
-                  ▤
-                </span>
+                <DocumentTextIcon
+                  size={20}
+                  strokeWidth={1.8}
+                  className="shrink-0"
+                  aria-hidden="true"
+                />
+
                 <span>Articles</span>
               </Link>
             </div>
@@ -78,7 +93,13 @@ export default async function AdminLayout({
                 className="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
               >
                 <span>View Website</span>
-                <span className="text-slate-500">↗</span>
+
+                <ExportIcon
+                  size={18}
+                  strokeWidth={1.8}
+                  className="text-slate-500"
+                  aria-hidden="true"
+                />
               </Link>
 
               <div className="mx-4 border-t border-slate-100" />
@@ -89,7 +110,13 @@ export default async function AdminLayout({
                   className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
                 >
                   <span>Sign out</span>
-                  <span className="text-slate-500">↪</span>
+
+                  <LogoutIcon
+                    size={18}
+                    strokeWidth={1.8}
+                    className="text-slate-500"
+                    aria-hidden="true"
+                  />
                 </button>
               </form>
             </div>

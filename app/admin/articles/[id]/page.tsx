@@ -1,8 +1,30 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+
+import RichTextEditor from "@/components/editor/RichTextEditor";
+import { createClient } from "@/lib/supabase/client";
+
+const MAX_COVER_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_COVER_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+type ContentFormat = "markdown" | "html";
+type ArticleStatus = "draft" | "published";
 
 type Article = {
   id: string;
@@ -10,25 +32,49 @@ type Article = {
   slug: string;
   excerpt: string | null;
   content: string;
+  content_format: ContentFormat | null;
   cover_image: string | null;
-  status: "draft" | "published";
+  authors: string[] | null;
+  editors: string[] | null;
+  status: ArticleStatus;
 };
 
-type EditorAction =
-  | "bold"
-  | "italic"
-  | "h2"
-  | "h3"
-  | "quote"
-  | "bullet"
-  | "number"
-  | "link";
+function getImageExtension(file: File) {
+  if (file.type === "image/jpeg") return "jpg";
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+
+  return "jpg";
+}
+
+function hasMeaningfulHtmlContent(html: string) {
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
+  if (text) return true;
+
+  return /<(img|hr|pre|blockquote|ul|ol)\b/i.test(html);
+}
+
+function hasMeaningfulContent(
+  content: string,
+  contentFormat: ContentFormat
+) {
+  if (contentFormat === "html") {
+    return hasMeaningfulHtmlContent(content);
+  }
+
+  return content.trim().length > 0;
+}
 
 export default function EditArticlePage() {
   const params = useParams();
   const id = params.id as string;
 
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const detailsContentRef = useRef<HTMLElement>(null);
 
   const [article, setArticle] = useState<Article | null>(null);
 
@@ -36,21 +82,39 @@ export default function EditArticlePage() {
   const [slug, setSlug] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
-  const [coverImage, setCoverImage] = useState("");
+  const [contentFormat, setContentFormat] =
+    useState<ContentFormat>("markdown");
   const [status, setStatus] =
-    useState<"draft" | "published">("draft");
+    useState<ArticleStatus>("draft");
 
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [editors, setEditors] = useState<string[]>([]);
+  const [authorInput, setAuthorInput] = useState("");
+  const [editorInput, setEditorInput] = useState("");
+
+  const [coverImage, setCoverImage] = useState("");
+  const [coverFileName, setCoverFileName] = useState("");
+  const [uploadedCoverPath, setUploadedCoverPath] =
+    useState<string | null>(null);
+
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [attemptedSave, setAttemptedSave] = useState(false);
 
-  const [previewMode, setPreviewMode] = useState(false);
+  const [error, setError] = useState("");
+  const [imageError, setImageError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadArticle() {
       try {
+        setLoading(true);
+        setError("");
+
         const response = await fetch(`/api/articles/${id}`, {
           cache: "no-store",
         });
@@ -58,28 +122,42 @@ export default function EditArticlePage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.error || "Failed to load article"
-          );
+          throw new Error(data.error || "Failed to load article");
         }
 
         if (cancelled) return;
 
         const loadedArticle = data.article as Article;
+        const resolvedFormat: ContentFormat =
+          loadedArticle.content_format === "html"
+            ? "html"
+            : "markdown";
 
         setArticle(loadedArticle);
-        setTitle(loadedArticle.title);
-        setSlug(loadedArticle.slug);
+        setTitle(loadedArticle.title || "");
+        setSlug(loadedArticle.slug || "");
         setExcerpt(loadedArticle.excerpt || "");
-        setContent(loadedArticle.content);
+        setContent(loadedArticle.content || "");
+        setContentFormat(resolvedFormat);
         setCoverImage(loadedArticle.cover_image || "");
+        setCoverFileName("");
         setStatus(loadedArticle.status);
-      } catch (error) {
+        setAuthors(
+          Array.isArray(loadedArticle.authors)
+            ? loadedArticle.authors
+            : []
+        );
+        setEditors(
+          Array.isArray(loadedArticle.editors)
+            ? loadedArticle.editors
+            : []
+        );
+      } catch (loadError) {
         if (cancelled) return;
 
         setError(
-          error instanceof Error
-            ? error.message
+          loadError instanceof Error
+            ? loadError.message
             : "Failed to load article"
         );
       } finally {
@@ -115,421 +193,297 @@ export default function EditArticlePage() {
     }
   }
 
-  function insertMarkdown(action: EditorAction) {
-    const textarea = contentRef.current;
+  function addContributor(type: "author" | "editor") {
+    const input = type === "author" ? authorInput : editorInput;
+    const name = input.trim();
 
-    if (!textarea) return;
+    if (!name) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    const selectedText = content.slice(start, end);
-
-    let replacement = "";
-    let cursorStart = start;
-    let cursorEnd = start;
-
-    switch (action) {
-      case "bold":
-        replacement = selectedText
-          ? `**${selectedText}**`
-          : "**bold text**";
-
-        cursorStart = start + 2;
-        cursorEnd = start + 2 + (
-          selectedText ? selectedText.length : 9
-        );
-        break;
-
-      case "italic":
-        replacement = selectedText
-          ? `*${selectedText}*`
-          : "*italic text*";
-
-        cursorStart = start + 1;
-        cursorEnd = start + 1 + (
-          selectedText ? selectedText.length : 11
-        );
-        break;
-
-      case "h2":
-        replacement = selectedText
-          ? `## ${selectedText}`
-          : "## Heading";
-
-        cursorStart = start + 3;
-        cursorEnd = start + 3 + (
-          selectedText ? selectedText.length : 7
-        );
-        break;
-
-      case "h3":
-        replacement = selectedText
-          ? `### ${selectedText}`
-          : "### Heading";
-
-        cursorStart = start + 4;
-        cursorEnd = start + 4 + (
-          selectedText ? selectedText.length : 7
-        );
-        break;
-
-      case "quote":
-        replacement = selectedText
-          ? selectedText
-              .split("\n")
-              .map((line) => `> ${line}`)
-              .join("\n")
-          : "> Quote";
-
-        cursorStart = start;
-        cursorEnd =
-          start + replacement.length;
-        break;
-
-      case "bullet":
-        replacement = selectedText
-          ? selectedText
-              .split("\n")
-              .map((line) => `- ${line}`)
-              .join("\n")
-          : "- List item";
-
-        cursorStart = start;
-        cursorEnd =
-          start + replacement.length;
-        break;
-
-      case "number":
-        replacement = selectedText
-          ? selectedText
-              .split("\n")
-              .map((line, index) => `${index + 1}. ${line}`)
-              .join("\n")
-          : "1. List item";
-
-        cursorStart = start;
-        cursorEnd =
-          start + replacement.length;
-        break;
-
-      case "link":
-        replacement = selectedText
-          ? `[${selectedText}](https://example.com)`
-          : "[Link text](https://example.com)";
-
-        cursorStart = start;
-        cursorEnd =
-          start + replacement.length;
-        break;
-
-      default:
-        return;
-    }
-
-    const newContent =
-      content.slice(0, start) +
-      replacement +
-      content.slice(end);
-
-    setContent(newContent);
-
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(
-        cursorStart,
-        cursorEnd
-      );
-    });
-  }
-
-  function renderInlineMarkdown(text: string) {
-    const parts = text.split(
-      /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*)/g
+    const current = type === "author" ? authors : editors;
+    const alreadyExists = current.some(
+      (person) => person.toLowerCase() === name.toLowerCase()
     );
 
-    return parts.map((part, index) => {
-      if (
-        part.startsWith("[") &&
-        part.includes("](") &&
-        part.endsWith(")")
-      ) {
-        const match = part.match(
-          /^\[([^\]]+)\]\(([^)]+)\)$/
-        );
-
-        if (match) {
-          return (
-            <a
-              key={index}
-              href={match[2]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
-            >
-              {match[1]}
-            </a>
-          );
-        }
+    if (!alreadyExists) {
+      if (type === "author") {
+        setAuthors((currentAuthors) => [...currentAuthors, name]);
+      } else {
+        setEditors((currentEditors) => [...currentEditors, name]);
       }
+    }
 
-      if (
-        part.startsWith("**") &&
-        part.endsWith("**")
-      ) {
-        return (
-          <strong key={index}>
-            {part.slice(2, -2)}
-          </strong>
-        );
-      }
+    if (type === "author") {
+      setAuthorInput("");
+    } else {
+      setEditorInput("");
+    }
+  }
 
-      if (
-        part.startsWith("*") &&
-        part.endsWith("*")
-      ) {
-        return (
-          <em key={index}>
-            {part.slice(1, -1)}
-          </em>
-        );
-      }
-
-      return (
-        <span key={index}>
-          {part}
-        </span>
+  function removeContributor(
+    type: "author" | "editor",
+    name: string
+  ) {
+    if (type === "author") {
+      setAuthors((current) =>
+        current.filter((person) => person !== name)
       );
+    } else {
+      setEditors((current) =>
+        current.filter((person) => person !== name)
+      );
+    }
+  }
+
+  function handleContributorKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    type: "author" | "editor"
+  ) {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addContributor(type);
+    }
+  }
+
+  function getContributorList(
+    people: string[],
+    pendingValue: string
+  ) {
+    const pending = pendingValue.trim();
+
+    if (!pending) return people;
+
+    const alreadyExists = people.some(
+      (person) => person.toLowerCase() === pending.toLowerCase()
+    );
+
+    if (alreadyExists) return people;
+
+    return [...people, pending];
+  }
+
+  function handleDetailsToggle() {
+    if (detailsOpen) {
+      setDetailsOpen(false);
+      return;
+    }
+
+    setDetailsOpen(true);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        detailsContentRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     });
   }
 
-  function renderMarkdown(markdown: string) {
-    const lines = markdown.split("\n");
-    const elements: React.ReactNode[] = [];
-
-    let index = 0;
-
-    while (index < lines.length) {
-      const line = lines[index];
-
-      if (!line.trim()) {
-        elements.push(
-          <div
-            key={`space-${index}`}
-            className="h-4"
-          />
-        );
-
-        index++;
-        continue;
-      }
-
-      if (line.startsWith("### ")) {
-        elements.push(
-          <h3
-            key={index}
-            className="mt-6 text-xl font-bold text-white"
-          >
-            {renderInlineMarkdown(line.slice(4))}
-          </h3>
-        );
-
-        index++;
-        continue;
-      }
-
-      if (line.startsWith("## ")) {
-        elements.push(
-          <h2
-            key={index}
-            className="mt-8 text-2xl font-bold text-white"
-          >
-            {renderInlineMarkdown(line.slice(3))}
-          </h2>
-        );
-
-        index++;
-        continue;
-      }
-
-      if (line.startsWith("# ")) {
-        elements.push(
-          <h1
-            key={index}
-            className="mt-8 text-3xl font-bold text-white"
-          >
-            {renderInlineMarkdown(line.slice(2))}
-          </h1>
-        );
-
-        index++;
-        continue;
-      }
-
-      if (line.startsWith("> ")) {
-        elements.push(
-          <blockquote
-            key={index}
-            className="my-4 border-l-4 border-slate-600 pl-4 italic text-slate-400"
-          >
-            {renderInlineMarkdown(line.slice(2))}
-          </blockquote>
-        );
-
-        index++;
-        continue;
-      }
-
-      if (
-        line.startsWith("- ") ||
-        line.startsWith("* ")
-      ) {
-        const listItems: React.ReactNode[] = [];
-
-        while (
-          index < lines.length &&
-          (lines[index].startsWith("- ") ||
-            lines[index].startsWith("* "))
-        ) {
-          listItems.push(
-            <li key={index}>
-              {renderInlineMarkdown(
-                lines[index].slice(2)
-              )}
-            </li>
-          );
-
-          index++;
-        }
-
-        elements.push(
-          <ul
-            key={`ul-${index}`}
-            className="my-4 list-disc space-y-2 pl-6 text-slate-300"
-          >
-            {listItems}
-          </ul>
-        );
-
-        continue;
-      }
-
-      if (/^\d+\.\s/.test(line)) {
-        const listItems: React.ReactNode[] = [];
-
-        while (
-          index < lines.length &&
-          /^\d+\.\s/.test(lines[index])
-        ) {
-          const itemText =
-            lines[index].replace(
-              /^\d+\.\s/,
-              ""
-            );
-
-          listItems.push(
-            <li key={index}>
-              {renderInlineMarkdown(itemText)}
-            </li>
-          );
-
-          index++;
-        }
-
-        elements.push(
-          <ol
-            key={`ol-${index}`}
-            className="my-4 list-decimal space-y-2 pl-6 text-slate-300"
-          >
-            {listItems}
-          </ol>
-        );
-
-        continue;
-      }
-
-      const paragraphLines = [line];
-
-      index++;
-
-      while (
-        index < lines.length &&
-        lines[index].trim() &&
-        !lines[index].startsWith("# ") &&
-        !lines[index].startsWith("## ") &&
-        !lines[index].startsWith("### ") &&
-        !lines[index].startsWith("> ") &&
-        !lines[index].startsWith("- ") &&
-        !lines[index].startsWith("* ") &&
-        !/^\d+\.\s/.test(lines[index])
-      ) {
-        paragraphLines.push(lines[index]);
-        index++;
-      }
-
-      elements.push(
-        <p
-          key={`p-${index}`}
-          className="my-4 leading-7 text-slate-300"
-        >
-          {paragraphLines.map(
-            (paragraphLine, lineIndex) => (
-              <span key={lineIndex}>
-                {lineIndex > 0 && <br />}
-                {renderInlineMarkdown(
-                  paragraphLine
-                )}
-              </span>
-            )
-          )}
-        </p>
-      );
+  function validateCoverImage(file: File) {
+    if (!ALLOWED_COVER_IMAGE_TYPES.includes(file.type)) {
+      return "Please choose a JPG, PNG, or WebP image.";
     }
 
-    return elements;
+    if (file.size > MAX_COVER_IMAGE_SIZE) {
+      return "Cover image must be 5 MB or smaller.";
+    }
+
+    return null;
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
+  async function uploadCoverImage(file: File) {
+    setImageError("");
 
-    setSaving(true);
-    setError("");
+    const validationError = validateCoverImage(file);
+
+    if (validationError) {
+      setImageError(validationError);
+      return;
+    }
+
+    setUploadingImage(true);
 
     try {
-      const response = await fetch(
-        `/api/articles/${id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title,
-            slug,
-            excerpt: excerpt || null,
-            content,
-            cover_image: coverImage || null,
-            status,
-          }),
+      const supabase = createClient();
+      const extension = getImageExtension(file);
+      const filePath = `covers/${crypto.randomUUID()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("article-covers")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("article-covers")
+        .getPublicUrl(filePath);
+
+      if (!publicUrlData.publicUrl) {
+        throw new Error("Unable to get the uploaded image URL.");
+      }
+
+      if (uploadedCoverPath) {
+        const { error: removeOldError } = await supabase.storage
+          .from("article-covers")
+          .remove([uploadedCoverPath]);
+
+        if (removeOldError) {
+          console.error(
+            "Failed to remove previous new cover:",
+            removeOldError
+          );
         }
+      }
+
+      setUploadedCoverPath(filePath);
+      setCoverFileName(file.name);
+      setCoverImage(publicUrlData.publicUrl);
+    } catch (uploadError) {
+      console.error("Cover image upload error:", uploadError);
+
+      setImageError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload cover image."
       );
+    } finally {
+      setUploadingImage(false);
+
+      if (coverInputRef.current) {
+        coverInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleCoverInputChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    await uploadCoverImage(file);
+  }
+
+  async function handleCoverDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDraggingImage(false);
+
+    if (uploadingImage) return;
+
+    const file = event.dataTransfer.files?.[0];
+
+    if (!file) return;
+
+    await uploadCoverImage(file);
+  }
+
+  async function handleRemoveCoverImage() {
+    setImageError("");
+
+    if (uploadedCoverPath) {
+      try {
+        const supabase = createClient();
+
+        const { error: removeError } = await supabase.storage
+          .from("article-covers")
+          .remove([uploadedCoverPath]);
+
+        if (removeError) {
+          throw removeError;
+        }
+      } catch (removeError) {
+        console.error("Cover image deletion error:", removeError);
+
+        setImageError(
+          "The cover was removed from the form, but Storage cleanup failed."
+        );
+      }
+    }
+
+    setCoverImage("");
+    setCoverFileName("");
+    setUploadedCoverPath(null);
+
+    if (coverInputRef.current) {
+      coverInputRef.current.value = "";
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setAttemptedSave(true);
+    setError("");
+
+    if (uploadingImage) {
+      setError("Please wait for the cover image to finish uploading.");
+      return;
+    }
+
+    const resolvedAuthors = getContributorList(authors, authorInput);
+    const resolvedEditors = getContributorList(editors, editorInput);
+
+    if (!title.trim()) {
+      setError("Please enter an article title.");
+      return;
+    }
+
+    if (!slug.trim()) {
+      setError("Please enter an article slug.");
+      return;
+    }
+
+    if (!hasMeaningfulContent(content, contentFormat)) {
+      setError("Please write some article content.");
+      return;
+    }
+
+    if (status === "published" && resolvedAuthors.length === 0) {
+      setError(
+        "Please add at least one author before saving a published article."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/articles/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          slug: slug.trim(),
+          excerpt: excerpt.trim() || null,
+          content,
+          content_format: contentFormat,
+          cover_image: coverImage || null,
+          authors: resolvedAuthors,
+          editors: resolvedEditors,
+          status,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to update article"
-        );
+        throw new Error(data.error || "Failed to update article");
       }
 
-      window.location.href =
-        "/admin/articles";
-    } catch (error) {
+      window.location.href = "/admin/articles";
+    } catch (saveError) {
       setError(
-        error instanceof Error
-          ? error.message
+        saveError instanceof Error
+          ? saveError.message
           : "Something went wrong"
       );
     } finally {
@@ -539,405 +493,589 @@ export default function EditArticlePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white">
-        <div className="mx-auto max-w-5xl px-6 py-10">
-          <p className="text-sm text-slate-400">
-            Loading article...
-          </p>
+      <div className="min-h-screen bg-white px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-sm text-slate-400">Loading article...</p>
         </div>
-      </main>
+      </div>
     );
   }
 
-  if (!article && error) {
+  if (!article) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white">
-        <div className="mx-auto max-w-5xl px-6 py-10">
-          <div className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-300">
-            {error}
+      <div className="min-h-screen bg-white px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error || "Article not found."}
           </div>
 
           <Link
             href="/admin/articles"
-            className="mt-5 inline-flex rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium transition hover:bg-slate-900"
+            className="mt-5 inline-flex rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             ← Back to Articles
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
+  const titleMissing = !title.trim();
+  const slugMissing = !slug.trim();
+  const contentMissing = !hasMeaningfulContent(content, contentFormat);
+  const authorsMissing = authors.length === 0 && !authorInput.trim();
+
+  const showTitleError = attemptedSave && titleMissing;
+  const showSlugError = attemptedSave && slugMissing;
+  const showContentError = attemptedSave && contentMissing;
+  const showAuthorsError =
+    attemptedSave && status === "published" && authorsMissing;
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <Link
-            href="/admin/articles"
-            className="text-sm text-slate-400 transition hover:text-white"
-          >
-            ← Back to Articles
-          </Link>
+    <div className="min-h-screen bg-white text-slate-950">
+      <form onSubmit={handleSubmit}>
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="flex min-h-[76px] flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <Link
+                href="/admin/articles"
+                className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+              >
+                <span>←</span>
+                <span>Articles</span>
+              </Link>
 
-          <h1 className="mt-4 text-3xl font-bold">
-            Edit Article
-          </h1>
+              <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
-          <p className="mt-2 text-sm text-slate-400">
-            Update and manage your article.
-          </p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-6"
-        >
-          {/* Article Details */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="mb-5 text-lg font-semibold">
-              Article Details
-            </h2>
-
-            <div className="space-y-5">
-              {/* Title */}
-              <div>
-                <label
-                  htmlFor="title"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Title
-                </label>
-
+              <div
+                className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1 transition ${
+                  showTitleError
+                    ? "bg-red-50 ring-1 ring-inset ring-red-200"
+                    : "bg-transparent"
+                }`}
+              >
                 <input
-                  id="title"
                   type="text"
                   value={title}
-                  onChange={(e) =>
-                    handleTitleChange(
-                      e.target.value
-                    )
+                  onChange={(event) =>
+                    handleTitleChange(event.target.value)
                   }
-                  required
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                />
-              </div>
-
-              {/* Slug */}
-              <div>
-                <label
-                  htmlFor="slug"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Slug
-                </label>
-
-                <input
-                  id="slug"
-                  type="text"
-                  value={slug}
-                  onChange={(e) =>
-                    setSlug(e.target.value)
-                  }
-                  required
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                  placeholder="Untitled article"
+                  aria-label="Article title"
+                  aria-required="true"
+                  className="min-w-0 flex-1 border-none bg-transparent text-xl font-semibold tracking-tight text-slate-900 outline-none placeholder:text-slate-400 sm:text-2xl"
                 />
 
-                <p className="mt-2 text-xs text-slate-500">
-                  Used in the article URL.
-                </p>
-              </div>
-
-              {/* Excerpt */}
-              <div>
-                <label
-                  htmlFor="excerpt"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Excerpt
-                </label>
-
-                <textarea
-                  id="excerpt"
-                  value={excerpt}
-                  onChange={(e) =>
-                    setExcerpt(e.target.value)
-                  }
-                  rows={3}
-                  className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                />
-              </div>
-
-              {/* Content */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label
-                    htmlFor="content"
-                    className="block text-sm font-medium"
-                  >
-                    Content
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewMode(
-                        !previewMode
-                      )
-                    }
-                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                  >
-                    {previewMode
-                      ? "Edit Content"
-                      : "Preview"}
-                  </button>
-                </div>
-
-                <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
-                  {!previewMode ? (
-                    <>
-                      {/* Toolbar */}
-                      <div className="flex flex-wrap gap-2 border-b border-slate-800 p-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "bold"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm font-bold transition hover:bg-slate-800"
-                        >
-                          B
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "italic"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm italic transition hover:bg-slate-800"
-                        >
-                          I
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "h2"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold transition hover:bg-slate-800"
-                        >
-                          H2
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "h3"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold transition hover:bg-slate-800"
-                        >
-                          H3
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "quote"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm transition hover:bg-slate-800"
-                        >
-                          Quote
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "bullet"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm transition hover:bg-slate-800"
-                        >
-                          • List
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "number"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm transition hover:bg-slate-800"
-                        >
-                          1. List
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            insertMarkdown(
-                              "link"
-                            )
-                          }
-                          className="rounded-md border border-slate-700 px-3 py-2 text-sm transition hover:bg-slate-800"
-                        >
-                          Link
-                        </button>
-                      </div>
-
-                      {/* Editor */}
-                      <textarea
-                        ref={contentRef}
-                        id="content"
-                        value={content}
-                        onChange={(e) =>
-                          setContent(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Write your article content..."
-                        rows={18}
-                        required
-                        className="w-full resize-y bg-slate-950 px-4 py-4 text-sm leading-7 outline-none"
-                      />
-                    </>
-                  ) : (
-                    /* Preview */
-                    <div className="min-h-[460px] px-6 py-6">
-                      {content.trim() ? (
-                        renderMarkdown(
-                          content
-                        )
-                      ) : (
-                        <p className="text-sm text-slate-500">
-                          Nothing to preview yet.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <p className="mt-2 text-xs text-slate-500">
-                  Supports Markdown formatting,
-                  headings, lists, quotes, links,
-                  bold, and italic text.
-                </p>
-              </div>
-
-              {/* Cover Image */}
-              <div>
-                <label
-                  htmlFor="coverImage"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Cover Image URL
-                </label>
-
-                <input
-                  id="coverImage"
-                  type="url"
-                  value={coverImage}
-                  onChange={(e) =>
-                    setCoverImage(
-                      e.target.value
-                    )
-                  }
-                  placeholder="https://example.com/image.jpg"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                />
-
-                {coverImage && (
-                  <div className="mt-4 overflow-hidden rounded-lg border border-slate-800">
-                    <img
-                      src={coverImage}
-                      alt="Cover preview"
-                      className="max-h-80 w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display =
-                          "none";
-                      }}
-                    />
-                  </div>
+                {showTitleError && (
+                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                    Required
+                  </span>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Publishing */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="mb-5 text-lg font-semibold">
-              Publishing
-            </h2>
-
-            <div>
-              <label
-                htmlFor="status"
-                className="mb-2 block text-sm font-medium"
-              >
-                Status
-              </label>
-
+            <div className="flex flex-wrap items-center gap-3">
               <select
-                id="status"
                 value={status}
-                onChange={(e) =>
-                  setStatus(
-                    e.target.value as
-                      | "draft"
-                      | "published"
-                  )
+                onChange={(event) =>
+                  setStatus(event.target.value as ArticleStatus)
                 }
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                aria-label="Article status"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-50 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
               >
-                <option value="draft">
-                  Draft
-                </option>
-
-                <option value="published">
-                  Published
-                </option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
               </select>
+
+              <button
+                type="submit"
+                disabled={saving || uploadingImage}
+                className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </div>
+        </header>
 
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-300">
-              {error}
+        {error && (
+          <div className="border-b border-red-200 bg-red-50 px-6 py-3 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Sticky Article Details Bar */}
+        <div className="sticky top-[76px] z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <h2 className="font-semibold text-slate-950">
+                Article details
+              </h2>
+
+              <p className="text-sm text-slate-400">
+                slug · excerpt · credits · cover image
+              </p>
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3">
-            <Link
-              href="/admin/articles"
-              className="rounded-lg border border-slate-700 px-5 py-3 text-sm font-medium transition hover:bg-slate-900"
-            >
-              Cancel
-            </Link>
 
             <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              onClick={handleDetailsToggle}
+              className="flex items-center gap-2 text-sm font-medium text-indigo-600 transition hover:text-indigo-700"
             >
-              {saving
-                ? "Saving..."
-                : "Save Changes"}
+              {detailsOpen ? "Collapse" : "Expand"}
+
+              <span
+                className={`transition-transform ${
+                  detailsOpen ? "rotate-180" : ""
+                }`}
+              >
+                ⌄
+              </span>
             </button>
           </div>
-        </form>
-      </div>
-    </main>
+        </div>
+
+        {detailsOpen && (
+          <section
+            ref={detailsContentRef}
+            className="scroll-mt-[133px] border-b border-slate-200 bg-white"
+          >
+            <div className="px-5 py-6">
+              <div className="grid items-start gap-8 lg:grid-cols-2">
+                {/* Slug + Excerpt */}
+                <div className="space-y-6">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <label
+                        htmlFor="slug"
+                        className="text-sm font-semibold text-slate-900"
+                      >
+                        Slug <span className="text-red-500">*</span>
+                      </label>
+
+                      {showSlugError && (
+                        <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                          Required
+                        </span>
+                      )}
+                    </div>
+
+                    <input
+                      id="slug"
+                      type="text"
+                      value={slug}
+                      onChange={(event) =>
+                        setSlug(generateSlug(event.target.value))
+                      }
+                      placeholder="article-slug"
+                      aria-required="true"
+                      className={`w-full rounded-xl border px-4 py-3 font-mono text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                        showSlugError
+                          ? "border-red-300 bg-red-50/60 focus:border-red-400 focus:ring-red-50"
+                          : "border-slate-200 bg-white focus:border-indigo-400 focus:ring-indigo-50"
+                      }`}
+                    />
+
+                    <p className="mt-2 text-sm text-slate-400">
+                      Public URL:{" "}
+                      <span className="font-mono text-slate-600">
+                        /articles/{slug || "article-slug"}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor="excerpt"
+                          className="text-sm font-semibold text-slate-900"
+                        >
+                          Excerpt
+                        </label>
+
+                        <span className="text-xs text-slate-400">
+                          Optional
+                        </span>
+                      </div>
+
+                      <span
+                        className={`text-xs ${
+                          excerpt.length > 160
+                            ? "text-amber-600"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {excerpt.length} / 160 recommended
+                      </span>
+                    </div>
+
+                    <textarea
+                      id="excerpt"
+                      value={excerpt}
+                      onChange={(event) => setExcerpt(event.target.value)}
+                      placeholder="One or two sentences summarising the article."
+                      rows={6}
+                      className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                    />
+
+                    <p className="mt-2 text-sm text-slate-400">
+                      Shown on the article list and at the top of the article.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cover Image */}
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <label className="block text-sm font-semibold text-slate-900">
+                      Cover image
+                    </label>
+
+                    <span className="text-xs text-slate-400">Optional</span>
+                  </div>
+
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleCoverInputChange}
+                    className="hidden"
+                  />
+
+                  {!coverImage ? (
+                    <div
+                      onDragEnter={(event) => {
+                        event.preventDefault();
+                        setIsDraggingImage(true);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setIsDraggingImage(true);
+                      }}
+                      onDragLeave={(event) => {
+                        event.preventDefault();
+                        setIsDraggingImage(false);
+                      }}
+                      onDrop={handleCoverDrop}
+                      className={`flex min-h-[225px] flex-col items-center justify-center rounded-xl border border-dashed px-6 py-8 text-center transition ${
+                        isDraggingImage
+                          ? "border-indigo-500 bg-indigo-50"
+                          : "border-slate-300 bg-slate-50/50"
+                      }`}
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-xl text-slate-500">
+                        ▧
+                      </div>
+
+                      <p className="mt-4 font-medium text-slate-900">
+                        {uploadingImage
+                          ? "Uploading image..."
+                          : "Drag an image here"}
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-400">
+                        JPG, PNG or WebP · up to 5 MB
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled={uploadingImage}
+                        onClick={() => coverInputRef.current?.click()}
+                        className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Browse files
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div
+                        role="img"
+                        aria-label="Article cover preview"
+                        className="h-[225px] w-full bg-slate-100 bg-cover bg-center"
+                        style={{
+                          backgroundImage: `url("${coverImage}")`,
+                        }}
+                      />
+
+                      <div className="flex flex-col gap-4 border-t border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {coverFileName || "Current article cover"}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {coverFileName
+                              ? "New cover uploaded to Supabase Storage"
+                              : "Existing article cover"}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            disabled={uploadingImage}
+                            onClick={() => coverInputRef.current?.click()}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Replace
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={uploadingImage}
+                            onClick={handleRemoveCoverImage}
+                            className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {imageError && (
+                    <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {imageError}
+                    </div>
+                  )}
+
+                  <p className="mt-2 text-sm text-slate-400">
+                    Used on the article list and at the top of the published article.
+                  </p>
+                </div>
+              </div>
+
+              {/* Credits */}
+              <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Article credits
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Add everyone who should be credited for writing or editing this article.
+                  </p>
+                </div>
+
+                <div className="mt-5 grid gap-6 lg:grid-cols-2">
+                  {/* Authors */}
+                  <div
+                    className={`rounded-xl p-3 transition ${
+                      showAuthorsError
+                        ? "bg-red-50/70 ring-1 ring-inset ring-red-200"
+                        : "bg-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <label
+                        htmlFor="author-name"
+                        className="text-sm font-semibold text-slate-900"
+                      >
+                        Authors <span className="text-red-500">*</span>
+                      </label>
+
+                      {showAuthorsError ? (
+                        <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                          Required to publish
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          Required to publish
+                        </span>
+                      )}
+                    </div>
+
+                    {authors.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {authors.map((author) => (
+                          <span
+                            key={author}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+                          >
+                            {author}
+
+                            <button
+                              type="button"
+                              aria-label={`Remove ${author}`}
+                              onClick={() =>
+                                removeContributor("author", author)
+                              }
+                              className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        id="author-name"
+                        type="text"
+                        value={authorInput}
+                        onChange={(event) =>
+                          setAuthorInput(event.target.value)
+                        }
+                        onKeyDown={(event) =>
+                          handleContributorKeyDown(event, "author")
+                        }
+                        placeholder="Author name"
+                        className={`min-w-0 flex-1 rounded-xl border px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                          showAuthorsError
+                            ? "border-red-300 bg-white focus:border-red-400 focus:ring-red-50"
+                            : "border-slate-200 bg-white focus:border-indigo-400 focus:ring-indigo-50"
+                        }`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => addContributor("author")}
+                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        + Add
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Press Enter or comma to add another author.
+                    </p>
+                  </div>
+
+                  {/* Editors */}
+                  <div className="border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <label
+                        htmlFor="editor-name"
+                        className="text-sm font-semibold text-slate-900"
+                      >
+                        Editors
+                      </label>
+
+                      <span className="text-xs text-slate-400">
+                        Optional
+                      </span>
+                    </div>
+
+                    {editors.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {editors.map((editor) => (
+                          <span
+                            key={editor}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+                          >
+                            {editor}
+
+                            <button
+                              type="button"
+                              aria-label={`Remove ${editor}`}
+                              onClick={() =>
+                                removeContributor("editor", editor)
+                              }
+                              className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        id="editor-name"
+                        type="text"
+                        value={editorInput}
+                        onChange={(event) =>
+                          setEditorInput(event.target.value)
+                        }
+                        onKeyDown={(event) =>
+                          handleContributorKeyDown(event, "editor")
+                        }
+                        placeholder="Editor name"
+                        className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => addContributor("editor")}
+                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        + Add
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Add as many editors as the article needs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Content */}
+        <section className="bg-white px-5 py-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <label className="text-sm font-semibold text-slate-900">
+                Article content <span className="text-red-500">*</span>
+              </label>
+
+              {showContentError ? (
+                <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                  Required
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">
+                  {contentFormat === "html"
+                    ? "Rich text article"
+                    : "Legacy Markdown article"}
+                </span>
+              )}
+            </div>
+
+            {contentFormat === "html" ? (
+              <div
+                className={`rounded-xl transition ${
+                  showContentError ? "ring-2 ring-red-200" : ""
+                }`}
+              >
+                <RichTextEditor
+                  key={id}
+                  initialContent={content}
+                  placeholder="Start writing..."
+                  stickyToolbarOffset={133}
+                  onChange={setContent}
+                />
+              </div>
+            ) : (
+              <div
+                className={`overflow-hidden rounded-xl border ${
+                  showContentError
+                    ? "border-red-300 ring-2 ring-red-100"
+                    : "border-slate-200"
+                }`}
+              >
+                <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  This is an older Markdown article. It stays in Markdown format when saved, so the original content is not converted or damaged.
+                </div>
+
+                <textarea
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  rows={24}
+                  placeholder="Write your article content..."
+                  className="min-h-[560px] w-full resize-y border-none bg-white px-5 py-5 font-mono text-sm leading-7 text-slate-700 outline-none"
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      </form>
+    </div>
   );
 }
