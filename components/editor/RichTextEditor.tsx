@@ -2,6 +2,7 @@
 
 import {
   ChangeEvent,
+  type ReactNode,
   useRef,
   useState,
 } from "react";
@@ -23,6 +24,28 @@ import {
   Color,
   TextStyle,
 } from "@tiptap/extension-text-style";
+
+import {
+  AltArrowLeftIcon,
+  AltArrowRightIcon,
+  ChatSquareIcon,
+  CodeIcon,
+  CodeSquareIcon,
+  EraserIcon,
+  GalleryAddIcon,
+  LinkIcon,
+  ListArrowDownIcon,
+  ListIcon,
+  MinusIcon,
+  RefreshIcon,
+  TextBoldIcon,
+  TextFormatIcon,
+  TextCrossIcon,
+  TextItalicIcon,
+  TextSelectionIcon,
+  TextUnderlineIcon,
+  UnlinkIcon,
+} from "@solar-icons/react/linear";
 
 import { createClient } from "@/lib/supabase/client";
 
@@ -54,7 +77,7 @@ type RichTextEditorProps = {
 };
 
 type ToolbarButtonProps = {
-  label: string;
+  label: ReactNode;
   title?: string;
   active?: boolean;
   disabled?: boolean;
@@ -76,8 +99,8 @@ function ToolbarButton({
       onClick={onClick}
       className={`flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition ${
         active
-          ? "bg-slate-900 text-white"
-          : "text-slate-600 hover:bg-white hover:text-slate-950"
+          ? "bg-[#04045E] text-white"
+          : "text-slate-600 hover:bg-white hover:text-[#04045E]"
       } disabled:cursor-not-allowed disabled:opacity-30`}
     >
       {label}
@@ -327,7 +350,7 @@ function EditorToolbar({
     >
       {/* History */}
       <ToolbarButton
-        label="↶"
+        label={<AltArrowLeftIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Undo"
         disabled={
           !state.canUndo
@@ -342,7 +365,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="↷"
+        label={<AltArrowRightIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Redo"
         disabled={
           !state.canRedo
@@ -429,7 +452,7 @@ function EditorToolbar({
 
       {/* Formatting */}
       <ToolbarButton
-        label="B"
+        label={<TextBoldIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Bold"
         active={
           state.bold
@@ -444,7 +467,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="I"
+        label={<TextItalicIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Italic"
         active={
           state.italic
@@ -459,7 +482,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="U"
+        label={<TextUnderlineIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Underline"
         active={
           state.underline
@@ -474,7 +497,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="S"
+        label={<TextCrossIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Strikethrough"
         active={
           state.strike
@@ -489,7 +512,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="<>"
+        label={<CodeIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Inline code"
         active={
           state.code
@@ -510,7 +533,11 @@ function EditorToolbar({
         title="Text color"
         className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sm font-bold text-slate-600 transition hover:bg-white"
       >
-        A
+        <TextFormatIcon
+          size={18}
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
 
         <span
           className="absolute bottom-1 left-2 right-2 h-0.5 rounded-full"
@@ -542,7 +569,7 @@ function EditorToolbar({
       </label>
 
       <ToolbarButton
-        label="A×"
+        label={<EraserIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Remove text color"
         onClick={() =>
           editor
@@ -558,11 +585,15 @@ function EditorToolbar({
         title="Highlight color"
         className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold transition ${
           state.highlight
-            ? "bg-slate-900 text-white"
+            ? "bg-[#04045E] text-white"
             : "text-slate-600 hover:bg-white"
         }`}
       >
-        ✎
+        <TextSelectionIcon
+          size={18}
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
 
         <span
           className="absolute bottom-1 left-2 right-2 h-1 rounded-sm"
@@ -598,7 +629,7 @@ function EditorToolbar({
       </label>
 
       <ToolbarButton
-        label="✎×"
+        label={<EraserIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Remove highlight"
         onClick={() =>
           editor
@@ -613,7 +644,7 @@ function EditorToolbar({
 
       {/* Link */}
       <ToolbarButton
-        label="🔗"
+        label={<LinkIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title={
           state.link
             ? "Edit link"
@@ -629,7 +660,7 @@ function EditorToolbar({
 
       {state.link && (
         <ToolbarButton
-          label="⊘"
+          label={<UnlinkIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
           title="Remove link"
           onClick={() =>
             editor
@@ -644,9 +675,20 @@ function EditorToolbar({
       {/* Image */}
       <ToolbarButton
         label={
-          uploadingImage
-            ? "…"
-            : "▧"
+          uploadingImage ? (
+            <RefreshIcon
+              size={18}
+              strokeWidth={1.8}
+              className="animate-spin"
+              aria-hidden="true"
+            />
+          ) : (
+            <GalleryAddIcon
+              size={18}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+          )
         }
         title="Insert image"
         disabled={
@@ -661,7 +703,7 @@ function EditorToolbar({
 
       {/* Lists */}
       <ToolbarButton
-        label="• List"
+        label={<ListIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Bullet list"
         active={
           state.bulletList
@@ -676,7 +718,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="1. List"
+        label={<ListArrowDownIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Numbered list"
         active={
           state.orderedList
@@ -691,7 +733,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="❞"
+        label={<ChatSquareIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Blockquote"
         active={
           state.blockquote
@@ -706,7 +748,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="{ }"
+        label={<CodeSquareIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Code block"
         active={
           state.codeBlock
@@ -721,7 +763,7 @@ function EditorToolbar({
       />
 
       <ToolbarButton
-        label="—"
+        label={<MinusIcon size={18} strokeWidth={1.8} aria-hidden="true" />}
         title="Horizontal divider"
         onClick={() =>
           editor
@@ -1096,7 +1138,7 @@ export default function RichTextEditor({
             [&_.tiptap_p]:my-4
 
             [&_.tiptap_a]:font-medium
-            [&_.tiptap_a]:text-indigo-600
+            [&_.tiptap_a]:text-[#007CB6]
             [&_.tiptap_a]:underline
             [&_.tiptap_a]:underline-offset-2
 
@@ -1112,8 +1154,8 @@ export default function RichTextEditor({
 
             [&_.tiptap_blockquote]:my-6
             [&_.tiptap_blockquote]:border-l-4
-            [&_.tiptap_blockquote]:border-indigo-400
-            [&_.tiptap_blockquote]:bg-indigo-50
+            [&_.tiptap_blockquote]:border-[#00B2D6]
+            [&_.tiptap_blockquote]:bg-[#F0FAFC]
             [&_.tiptap_blockquote]:px-5
             [&_.tiptap_blockquote]:py-2
             [&_.tiptap_blockquote]:italic
@@ -1161,7 +1203,7 @@ export default function RichTextEditor({
        * placeholder disappears.
        */}
       <style jsx global>{`
-        .tiptap p.is-editor-empty:first-child::before {
+        .tiptap.is-editor-empty p:first-child::before {
           color: #94a3b8;
           content: attr(data-placeholder);
           float: left;
@@ -1169,8 +1211,8 @@ export default function RichTextEditor({
           pointer-events: none;
         }
 
-        .tiptap.ProseMirror-focused
-          p.is-editor-empty:first-child::before {
+        .tiptap.ProseMirror-focused.is-editor-empty
+          p:first-child::before {
           content: "";
         }
       `}</style>

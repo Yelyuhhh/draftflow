@@ -12,6 +12,17 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
+import {
+  AddCircleIcon,
+  AltArrowDownIcon,
+  AltArrowLeftIcon,
+  CloseCircleIcon,
+  DisketteIcon,
+  GalleryAddIcon,
+  RefreshIcon,
+  TrashBin2Icon,
+} from "@solar-icons/react/linear";
+
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { createClient } from "@/lib/supabase/client";
 
@@ -513,7 +524,12 @@ export default function EditArticlePage() {
             href="/admin/articles"
             className="mt-5 inline-flex rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            ← Back to Articles
+            <AltArrowLeftIcon
+              size={17}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+            <span>Back to Articles</span>
           </Link>
         </div>
       </div>
@@ -542,7 +558,11 @@ export default function EditArticlePage() {
                 href="/admin/articles"
                 className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
               >
-                <span>←</span>
+                <AltArrowLeftIcon
+                  size={17}
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                />
                 <span>Articles</span>
               </Link>
 
@@ -582,7 +602,7 @@ export default function EditArticlePage() {
                   setStatus(event.target.value as ArticleStatus)
                 }
                 aria-label="Article status"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-50 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-50 focus:border-[#00B2D6] focus:ring-4 focus:ring-[#CBF2F9]"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
@@ -591,9 +611,24 @@ export default function EditArticlePage() {
               <button
                 type="submit"
                 disabled={saving || uploadingImage}
-                className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#04045E] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#007CB6] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? (
+                  <RefreshIcon
+                    size={18}
+                    strokeWidth={1.8}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <DisketteIcon
+                    size={18}
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
+                )}
+
+                <span>{saving ? "Saving..." : "Save Changes"}</span>
               </button>
             </div>
           </div>
@@ -621,17 +656,18 @@ export default function EditArticlePage() {
             <button
               type="button"
               onClick={handleDetailsToggle}
-              className="flex items-center gap-2 text-sm font-medium text-indigo-600 transition hover:text-indigo-700"
+              className="flex items-center gap-2 text-sm font-medium text-[#007CB6] transition hover:text-[#04045E]"
             >
               {detailsOpen ? "Collapse" : "Expand"}
 
-              <span
+              <AltArrowDownIcon
+                size={17}
+                strokeWidth={1.8}
                 className={`transition-transform ${
                   detailsOpen ? "rotate-180" : ""
                 }`}
-              >
-                ⌄
-              </span>
+                aria-hidden="true"
+              />
             </button>
           </div>
         </div>
@@ -673,7 +709,7 @@ export default function EditArticlePage() {
                       className={`w-full rounded-xl border px-4 py-3 font-mono text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
                         showSlugError
                           ? "border-red-300 bg-red-50/60 focus:border-red-400 focus:ring-red-50"
-                          : "border-slate-200 bg-white focus:border-indigo-400 focus:ring-indigo-50"
+                          : "border-slate-200 bg-white focus:border-[#00B2D6] focus:ring-[#CBF2F9]"
                       }`}
                     />
 
@@ -717,7 +753,7 @@ export default function EditArticlePage() {
                       onChange={(event) => setExcerpt(event.target.value)}
                       placeholder="One or two sentences summarising the article."
                       rows={6}
-                      className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                      className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#00B2D6] focus:ring-4 focus:ring-[#CBF2F9]"
                     />
 
                     <p className="mt-2 text-sm text-slate-400">
@@ -761,12 +797,25 @@ export default function EditArticlePage() {
                       onDrop={handleCoverDrop}
                       className={`flex min-h-[225px] flex-col items-center justify-center rounded-xl border border-dashed px-6 py-8 text-center transition ${
                         isDraggingImage
-                          ? "border-indigo-500 bg-indigo-50"
+                          ? "border-[#00B2D6] bg-[#F0FAFC]"
                           : "border-slate-300 bg-slate-50/50"
                       }`}
                     >
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-xl text-slate-500">
-                        ▧
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#CBF2F9] text-[#007CB6]">
+                        {uploadingImage ? (
+                          <RefreshIcon
+                            size={24}
+                            strokeWidth={1.8}
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <GalleryAddIcon
+                            size={24}
+                            strokeWidth={1.8}
+                            aria-hidden="true"
+                          />
+                        )}
                       </div>
 
                       <p className="mt-4 font-medium text-slate-900">
@@ -785,7 +834,14 @@ export default function EditArticlePage() {
                         onClick={() => coverInputRef.current?.click()}
                         className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Browse files
+                        <span className="inline-flex items-center gap-2">
+                          <GalleryAddIcon
+                            size={16}
+                            strokeWidth={1.8}
+                            aria-hidden="true"
+                          />
+                          Browse files
+                        </span>
                       </button>
                     </div>
                   ) : (
@@ -819,7 +875,14 @@ export default function EditArticlePage() {
                             onClick={() => coverInputRef.current?.click()}
                             className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                           >
-                            Replace
+                            <span className="inline-flex items-center gap-1.5">
+                              <GalleryAddIcon
+                                size={15}
+                                strokeWidth={1.8}
+                                aria-hidden="true"
+                              />
+                              Replace
+                            </span>
                           </button>
 
                           <button
@@ -828,7 +891,14 @@ export default function EditArticlePage() {
                             onClick={handleRemoveCoverImage}
                             className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                           >
-                            Remove
+                            <span className="inline-flex items-center gap-1.5">
+                              <TrashBin2Icon
+                                size={15}
+                                strokeWidth={1.8}
+                                aria-hidden="true"
+                              />
+                              Remove
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -904,7 +974,11 @@ export default function EditArticlePage() {
                               }
                               className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                             >
-                              ×
+                              <CloseCircleIcon
+                                size={14}
+                                strokeWidth={1.8}
+                                aria-hidden="true"
+                              />
                             </button>
                           </span>
                         ))}
@@ -926,7 +1000,7 @@ export default function EditArticlePage() {
                         className={`min-w-0 flex-1 rounded-xl border px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
                           showAuthorsError
                             ? "border-red-300 bg-white focus:border-red-400 focus:ring-red-50"
-                            : "border-slate-200 bg-white focus:border-indigo-400 focus:ring-indigo-50"
+                            : "border-slate-200 bg-white focus:border-[#00B2D6] focus:ring-[#CBF2F9]"
                         }`}
                       />
 
@@ -935,7 +1009,14 @@ export default function EditArticlePage() {
                         onClick={() => addContributor("author")}
                         className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        + Add
+                        <span className="inline-flex items-center gap-1.5">
+                          <AddCircleIcon
+                            size={16}
+                            strokeWidth={1.8}
+                            aria-hidden="true"
+                          />
+                          Add
+                        </span>
                       </button>
                     </div>
 
@@ -976,7 +1057,11 @@ export default function EditArticlePage() {
                               }
                               className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                             >
-                              ×
+                              <CloseCircleIcon
+                                size={14}
+                                strokeWidth={1.8}
+                                aria-hidden="true"
+                              />
                             </button>
                           </span>
                         ))}
@@ -995,7 +1080,7 @@ export default function EditArticlePage() {
                           handleContributorKeyDown(event, "editor")
                         }
                         placeholder="Editor name"
-                        className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                        className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#00B2D6] focus:ring-4 focus:ring-[#CBF2F9]"
                       />
 
                       <button
@@ -1003,7 +1088,14 @@ export default function EditArticlePage() {
                         onClick={() => addContributor("editor")}
                         className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        + Add
+                        <span className="inline-flex items-center gap-1.5">
+                          <AddCircleIcon
+                            size={16}
+                            strokeWidth={1.8}
+                            aria-hidden="true"
+                          />
+                          Add
+                        </span>
                       </button>
                     </div>
 
