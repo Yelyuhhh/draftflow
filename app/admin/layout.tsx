@@ -82,6 +82,47 @@ export default async function AdminLayout({
 
                 <span>Articles</span>
               </Link>
+
+              <Link
+                href="/admin/fun-facts"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 shrink-0"
+                  aria-hidden="true"
+                >
+                  <rect
+                    x="3"
+                    y="4"
+                    width="18"
+                    height="16"
+                    rx="3"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+
+                  <circle
+                    cx="8.5"
+                    cy="9"
+                    r="1.5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+
+                  <path
+                    d="M5.5 17L10 12.5L13 15.5L15 13.5L18.5 17"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+
+                <span>Fun Facts</span>
+              </Link>
             </div>
           </nav>
 
